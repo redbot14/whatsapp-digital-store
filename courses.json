@@ -1,0 +1,38 @@
+[
+  {
+    "id": "course_1",
+    "name": "ফ্রিল্যান্সিং মাস্টারক্লাস",
+    "description": "স্ক্র্যাচ থেকে ফ্রিল্যান্সিং শিখে ফাইভার ও আপওয়ার্কে সফল ক্যারিয়ার গড়ুন। সঠিক গাইডলাইন এবং প্র্যাকটিক্যাল প্রজেক্টের মাধ্যমে নিজের দক্ষতা বৃদ্ধি করুন।",
+    "price": 799,
+    "duration": "৮ সপ্তাহ",
+    "accessLink": "https://drive.google.com/drive/folders/freelancing-masterclass",
+    "active": true
+  },
+  {
+    "id": "course_2",
+    "name": "ফেসবুক ও ইনস্টাগ্রাম মার্কেটিং",
+    "description": "ডিজিটাল মার্কেটিং এর সিক্রেট স্ট্র্যাটেজি শিখুন। নিজের ব্যবসা বা ক্লায়েন্টের জন্য কার্যকরী অ্যাড রান করে সেলস এবং রিচ বহুগুণে বৃদ্ধি করার সম্পূর্ণ গাইডলাইন।",
+    "price": 599,
+    "duration": "৪ সপ্তাহ",
+    "accessLink": "https://drive.google.com/drive/folders/fb-ig-marketing",
+    "active": true
+  },
+  {
+    "id": "course_3",
+    "name": "ওয়েব ডিজাইন উইথ ফিগমা",
+    "description": "ফিগমা ব্যবহার করে প্রফেশনাল ওয়েবসাইট এবং অ্যাপের ইউজার ইন্টারফেস (UI/UX) ডিজাইন শিখুন। পোর্টফোলিও তৈরি করে লোকাল ও গ্লোবাল মার্কেটে কাজ শুরু করুন।",
+    "price": 499,
+    "duration": "৬ সপ্তাহ",
+    "accessLink": "https://teachable.com/course/web-design-figma",
+    "active": true
+  },
+  {
+    "id": "course_4",
+    "name": "নতুনদের জন্য পাইথন",
+    "description": "প্রোগ্রামিং এর কোনো পূর্ব অভিজ্ঞতা ছাড়াই পাইথন শিখুন। বেসিক সিনট্যাক্স থেকে শুরু করে ছোট ছোট প্রজেক্ট তৈরি করার মাধ্যমে প্রোগ্রামিং ভীতি দূর করুন।",
+    "price": 699,
+    "duration": "৬ সপ্তাহ",
+    "accessLink": "https://teachable.com/course/python-for-beginners",
+    "active": true
+  }
+]
