@@ -85,8 +85,11 @@ async function connectToWhatsApp() {
         if (!text.trim()) return;
 
         const textLower = text.trim().toLowerCase();
-        const adminJid = `${process.env.ADMIN_NUMBER}@s.whatsapp.net`;
-        const isAdmin = sender === adminJid;
+        
+        // Safe Admin JID generation
+        const adminNumber = (process.env.ADMIN_NUMBER || "").replace(/[^0-9]/g, '');
+        const adminJid = adminNumber ? `${adminNumber}@s.whatsapp.net` : null;
+        const isAdmin = adminJid && sender === adminJid;
 
         try {
             // ==========================================
@@ -142,7 +145,7 @@ async function connectToWhatsApp() {
                 if (isNaN(courseIndex)) return;
 
                 const courses = await getCourses();
-                const course = courses[courseIndex - 1]; // Assuming index starts at 1
+                const course = courses[courseIndex - 1]; 
                 
                 if (!course) {
                     await sock.sendMessage(sender, { text: "কোর্সটি পাওয়া যায়নি। সঠিক নম্বর দিন।" });
@@ -203,8 +206,10 @@ async function connectToWhatsApp() {
                     await sock.sendMessage(sender, { text: `✅ ধন্যবাদ! আপনার TrxID ${trxId} পেয়েছি। ২৪ ঘণ্টার মধ্যে কনফার্ম করা হবে।` });
                     
                     // Notify Admin
-                    const adminMsg = `🔔 নতুন অর্ডার!\nকাস্টমার: ${sender.split('@')[0]}\nকোর্স: ${state.courseName}\nদাম: ${state.price}\nTrxID: ${trxId}\nঅর্ডার আইডি: ${state.orderId}\n\nকনফার্ম করতে লিখুন: confirm ${state.orderId}`;
-                    await sock.sendMessage(adminJid, { text: adminMsg });
+                    if (adminJid) {
+                        const adminMsg = `🔔 নতুন অর্ডার!\nকাস্টমার: ${sender.split('@')[0]}\nকোর্স: ${state.courseName}\nদাম: ${state.price}\nTrxID: ${trxId}\nঅর্ডার আইডি: ${state.orderId}\n\nকনফার্ম করতে লিখুন: confirm ${state.orderId}`;
+                        await sock.sendMessage(adminJid, { text: adminMsg });
+                    }
                     
                     console.log(`[Payment] Received TrxID ${trxId} for order ${state.orderId}`);
                     delete userStates[sender];
@@ -258,9 +263,9 @@ async function connectToWhatsApp() {
             // 10. SUPPORT
             // ==========================================
             if (textLower === '3' || textLower === 'support' || textLower === 'সাপোর্ট') {
-                // Forward the literal trigger message to admin as requested, 
-                // but usually users attach context, handle both explicit trigger and conversational trigger
-                await sock.sendMessage(adminJid, { text: `📩 সাপোর্ট মেসেজ (${sender.split('@')[0]}):\n\n${text}` });
+                if (adminJid) {
+                    await sock.sendMessage(adminJid, { text: `📩 সাপোর্ট মেসেজ (${sender.split('@')[0]}):\n\n${text}` });
+                }
                 await sock.sendMessage(sender, { text: "আপনার বার্তা আমাদের টিমে পাঠানো হয়েছে। শীঘ্রই উত্তর দেওয়া হবে।" });
                 return;
             }
@@ -291,7 +296,14 @@ async function connectToWhatsApp() {
 
         } catch (err) {
             console.error("[Error in message processing]", err);
-            await sock.sendMessage(sender, { text: "সাময়িক ত্রুটি হয়েছে। মূল মেনুতে ফিরতে 'menu' লিখুন।" });
+            // Added try-catch here to prevent crashing if the sender JID is invalid (406 error)
+            try {
+                if (sender) {
+                    await sock.sendMessage(sender, { text: "সাময়িক ত্রুটি হয়েছে। মূল মেনুতে ফিরতে 'menu' লিখুন।" });
+                }
+            } catch (fallbackErr) {
+                console.error("[Error sending fallback message]", fallbackErr.message);
+            }
         }
     });
 }
