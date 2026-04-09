@@ -42,6 +42,16 @@ async function connectToWhatsApp() {
         browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
+    // Helper function to prevent 406 Not Acceptable crashes
+    async function safeSend(jid, content) {
+        if (!jid) return;
+        try {
+            await sock.sendMessage(jid, content);
+        } catch (error) {
+            console.error(`[SafeSend Error] Failed to send to ${jid}:`, error.message);
+        }
+    }
+
     // Connection Events
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -71,10 +81,9 @@ async function connectToWhatsApp() {
         
         const msg = messages[0];
         
-        // Loop Protection
-        if (!msg.message || msg.key.fromMe) return;
+        // Loop & Type Protection: Only allow standard 1-on-1 private chats
         const sender = msg.key.remoteJid;
-        if (sender === 'status@broadcast') return;
+        if (!msg.message || msg.key.fromMe || !sender || !sender.endsWith('@s.whatsapp.net')) return;
 
         // Extract Text Content
         const text = msg.message.conversation || 
@@ -106,18 +115,14 @@ async function connectToWhatsApp() {
                 const order = pendingOrders.find(o => String(o.id) === String(orderId) || String(o.orderId) === String(orderId));
                 
                 if (order) {
-                    // Fetch course access link
                     const course = await getCourseById(order.courseId);
                     const accessLink = course?.accessLink || "No link found";
 
-                    // Notify customer
-                    await sock.sendMessage(order.customerId, { text: `🎉 পেমেন্ট কনফার্ম! আপনার কোর্স লিঙ্ক:\n${accessLink}` });
-                    
-                    // Notify admin
-                    await sock.sendMessage(adminJid, { text: `✅ Done! Order ${orderId} confirmed.` });
+                    await safeSend(order.customerId, { text: `🎉 পেমেন্ট কনফার্ম! আপনার কোর্স লিঙ্ক:\n${accessLink}` });
+                    await safeSend(adminJid, { text: `✅ Done! Order ${orderId} confirmed.` });
                     console.log(`[Admin] Order ${orderId} confirmed.`);
                 } else {
-                    await sock.sendMessage(adminJid, { text: `⚠️ Order ${orderId} not found in pending list.` });
+                    await safeSend(adminJid, { text: `⚠️ Order ${orderId} not found in pending list.` });
                 }
                 return;
             }
@@ -125,7 +130,7 @@ async function connectToWhatsApp() {
             if (isAdmin && (textLower === 'orders' || textLower === 'অর্ডার')) {
                 const pendingOrders = await getPendingOrders();
                 if (pendingOrders.length === 0) {
-                    await sock.sendMessage(adminJid, { text: "কোনো পেন্ডিং অর্ডার নেই।" });
+                    await safeSend(adminJid, { text: "কোনো পেন্ডিং অর্ডার নেই।" });
                     return;
                 }
                 
@@ -133,7 +138,7 @@ async function connectToWhatsApp() {
                 pendingOrders.forEach((o, i) => {
                     reply += `${i + 1}. Order ID: ${o.id || o.orderId}\nকাস্টমার: ${o.customerId.split('@')[0]}\nকোর্স: ${o.courseName}\nTrxID: ${o.trxId}\n\n`;
                 });
-                await sock.sendMessage(adminJid, { text: reply });
+                await safeSend(adminJid, { text: reply });
                 return;
             }
 
@@ -148,7 +153,7 @@ async function connectToWhatsApp() {
                 const course = courses[courseIndex - 1]; 
                 
                 if (!course) {
-                    await sock.sendMessage(sender, { text: "কোর্সটি পাওয়া যায়নি। সঠিক নম্বর দিন।" });
+                    await safeSend(sender, { text: "কোর্সটি পাওয়া যায়নি। সঠিক নম্বর দিন।" });
                     return;
                 }
 
@@ -165,7 +170,7 @@ async function connectToWhatsApp() {
                 console.log(`[Order] New order ${orderId} generated for ${sender}`);
 
                 const paymentInstructions = `bKash: ${process.env.PAYMENT_BKASH} অথবা Nagad: ${process.env.PAYMENT_NAGAD}\nপরিমাণ: ${course.price} টাকা\nপেমেন্ট করার পর Transaction ID পাঠান।`;
-                await sock.sendMessage(sender, { text: paymentInstructions });
+                await safeSend(sender, { text: paymentInstructions });
 
                 userStates[sender] = { 
                     step: 'AWAITING_TRXID', 
@@ -191,8 +196,8 @@ async function connectToWhatsApp() {
                         if (course) {
                             const details = buildCourseDetail(course);
                             const promptMsg = `\n\nকিনতে চান? নিচে লিখুন: buy ${courseIndex}`;
-                            await sock.sendMessage(sender, { text: details + promptMsg });
-                            delete userStates[sender]; // Clear state to allow buying
+                            await safeSend(sender, { text: details + promptMsg });
+                            delete userStates[sender]; 
                             return;
                         }
                     }
@@ -202,13 +207,11 @@ async function connectToWhatsApp() {
                     const trxId = text.trim();
                     await updateOrder(state.orderId, { trxId: trxId, status: 'AWAITING_VERIFY' });
                     
-                    // Notify Customer
-                    await sock.sendMessage(sender, { text: `✅ ধন্যবাদ! আপনার TrxID ${trxId} পেয়েছি। ২৪ ঘণ্টার মধ্যে কনফার্ম করা হবে।` });
+                    await safeSend(sender, { text: `✅ ধন্যবাদ! আপনার TrxID ${trxId} পেয়েছি। ২৪ ঘণ্টার মধ্যে কনফার্ম করা হবে।` });
                     
-                    // Notify Admin
                     if (adminJid) {
                         const adminMsg = `🔔 নতুন অর্ডার!\nকাস্টমার: ${sender.split('@')[0]}\nকোর্স: ${state.courseName}\nদাম: ${state.price}\nTrxID: ${trxId}\nঅর্ডার আইডি: ${state.orderId}\n\nকনফার্ম করতে লিখুন: confirm ${state.orderId}`;
-                        await sock.sendMessage(adminJid, { text: adminMsg });
+                        await safeSend(adminJid, { text: adminMsg });
                     }
                     
                     console.log(`[Payment] Received TrxID ${trxId} for order ${state.orderId}`);
@@ -223,7 +226,7 @@ async function connectToWhatsApp() {
             const menuTriggers = ["hi", "hello", "start", "menu", "হ্যালো", "শুরু"];
             if (menuTriggers.includes(textLower)) {
                 const menuText = buildMainMenu();
-                await sock.sendMessage(sender, { text: menuText });
+                await safeSend(sender, { text: menuText });
                 delete userStates[sender];
                 return;
             }
@@ -234,7 +237,7 @@ async function connectToWhatsApp() {
             if (textLower === '1' || textLower === 'courses' || textLower === 'কোর্স') {
                 const courses = await getCourses();
                 const courseListStr = buildCourseList(courses);
-                await sock.sendMessage(sender, { text: courseListStr });
+                await safeSend(sender, { text: courseListStr });
                 
                 userStates[sender] = { step: 'AWAITING_COURSE_SELECTION' };
                 return;
@@ -246,7 +249,7 @@ async function connectToWhatsApp() {
             if (textLower === '2' || textLower === 'my orders' || textLower === 'আমার অর্ডার') {
                 const orders = await getOrdersByCustomer(sender);
                 if (!orders || orders.length === 0) {
-                    await sock.sendMessage(sender, { text: "আপনার কোনো অর্ডার পাওয়া যায়নি।" });
+                    await safeSend(sender, { text: "আপনার কোনো অর্ডার পাওয়া যায়নি।" });
                     return;
                 }
                 
@@ -255,7 +258,7 @@ async function connectToWhatsApp() {
                     const dateStr = new Date(o.timestamp).toLocaleDateString('bn-BD');
                     orderReply += `${i + 1}. ${o.courseName}\nস্ট্যাটাস: ${o.status}\nতারিখ: ${dateStr}\n\n`;
                 });
-                await sock.sendMessage(sender, { text: orderReply });
+                await safeSend(sender, { text: orderReply });
                 return;
             }
 
@@ -264,9 +267,9 @@ async function connectToWhatsApp() {
             // ==========================================
             if (textLower === '3' || textLower === 'support' || textLower === 'সাপোর্ট') {
                 if (adminJid) {
-                    await sock.sendMessage(adminJid, { text: `📩 সাপোর্ট মেসেজ (${sender.split('@')[0]}):\n\n${text}` });
+                    await safeSend(adminJid, { text: `📩 সাপোর্ট মেসেজ (${sender.split('@')[0]}):\n\n${text}` });
                 }
-                await sock.sendMessage(sender, { text: "আপনার বার্তা আমাদের টিমে পাঠানো হয়েছে। শীঘ্রই উত্তর দেওয়া হবে।" });
+                await safeSend(sender, { text: "আপনার বার্তা আমাদের টিমে পাঠানো হয়েছে। শীঘ্রই উত্তর দেওয়া হবে।" });
                 return;
             }
 
@@ -285,25 +288,18 @@ async function connectToWhatsApp() {
                 
                 const aiReply = response.choices[0]?.message?.content?.trim();
                 if (aiReply) {
-                    await sock.sendMessage(sender, { text: aiReply });
+                    await safeSend(sender, { text: aiReply });
                 } else {
                     throw new Error("Empty response from HuggingFace AI.");
                 }
             } catch (aiError) {
                 console.error("[AI Error]", aiError.message);
-                await sock.sendMessage(sender, { text: "বুঝতে পারিনি। মূল মেনুতে ফিরতে 'menu' লিখুন।" });
+                await safeSend(sender, { text: "বুঝতে পারিনি। মূল মেনুতে ফিরতে 'menu' লিখুন।" });
             }
 
         } catch (err) {
             console.error("[Error in message processing]", err);
-            // Added try-catch here to prevent crashing if the sender JID is invalid (406 error)
-            try {
-                if (sender) {
-                    await sock.sendMessage(sender, { text: "সাময়িক ত্রুটি হয়েছে। মূল মেনুতে ফিরতে 'menu' লিখুন।" });
-                }
-            } catch (fallbackErr) {
-                console.error("[Error sending fallback message]", fallbackErr.message);
-            }
+            await safeSend(sender, { text: "সাময়িক ত্রুটি হয়েছে। মূল মেনুতে ফিরতে 'menu' লিখুন।" });
         }
     });
 }
