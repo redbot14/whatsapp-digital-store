@@ -1,0 +1,37 @@
+name: WhatsApp Digital Store Bot
+
+# IMPORTANT NOTES:
+# - First Run: The user must trigger this workflow manually (via workflow_dispatch) to scan the QR code in the Action terminal logs.
+# - Session Storage: The session_data folder generated after scanning the QR must be committed and stored in the repository itself to persist authentication.
+# - Auto-Restart: GitHub Actions has a hard 6-hour limit per job. This workflow runs on a 5-hour restart cycle (cron schedule + 295 min timeout) to keep the bot alive 24/7 without timing out.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */5 * * *'
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Bot
+        run: npm start
+        timeout-minutes: 295
+        env:
+          FIREBASE_URL: ${{ secrets.FIREBASE_URL }}
+          ADMIN_NUMBER: ${{ secrets.ADMIN_NUMBER }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          PAYMENT_BKASH: ${{ secrets.PAYMENT_BKASH }}
+          PAYMENT_NAGAD: ${{ secrets.PAYMENT_NAGAD }}
